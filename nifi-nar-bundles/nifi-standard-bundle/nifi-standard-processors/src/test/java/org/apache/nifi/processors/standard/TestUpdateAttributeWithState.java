@@ -7,9 +7,6 @@ import org.junit.Test;
 
 import static org.junit.Assert.*;
 
-/**
- * Created by jpercivall on 3/5/16.
- */
 public class TestUpdateAttributeWithState {
 
 
@@ -19,7 +16,9 @@ public class TestUpdateAttributeWithState {
 
         runner.setProperty(UpdateAttributeWithState.ATTRIBUTE_NAME, "theCount");
         runner.setProperty(UpdateAttributeWithState.ATTRIBUTE_VALUE_TO_SET, "${count}");
-        runner.setProperty("count", "${count:plus(1)}");
+        runner.setProperty("1count", "${count:plus(1)}");
+        runner.setProperty("2count", "${count:plus(count:plus(1))}");
+        runner.setProperty("3count", "${count:plus(1)}");
 
         runner.enqueue("1".getBytes());
         runner.enqueue("2".getBytes());
