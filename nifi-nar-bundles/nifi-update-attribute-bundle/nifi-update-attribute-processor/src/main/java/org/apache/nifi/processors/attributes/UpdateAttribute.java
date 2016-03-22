@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,6 +51,8 @@ import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.Validator;
 import org.apache.nifi.components.state.Scope;
+import org.apache.nifi.components.state.StateManager;
+import org.apache.nifi.components.state.StateMap;
 import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.flowfile.attributes.CoreAttributes;
@@ -176,15 +179,15 @@ public class UpdateAttribute extends AbstractProcessor implements Searchable {
 
 
 
-    static final AllowableValue LOCATION_STATELESS = new AllowableValue("Stateless", "Local", "");
-    static final AllowableValue LOCATION_LOCAL = new AllowableValue("Local", "Local", "");
-    static final AllowableValue LOCATION_REMOTE = new AllowableValue("Remote", "Remote", "");
+    public static final AllowableValue LOCATION_STATELESS = new AllowableValue("Stateless", "Stateless", "");
+    public static final AllowableValue LOCATION_LOCAL = new AllowableValue("Local", "Local", "");
+    public static final AllowableValue LOCATION_REMOTE = new AllowableValue("Remote", "Remote", "");
 
-    static final PropertyDescriptor STATE_LOCATION = new PropertyDescriptor.Builder()
+    public static final PropertyDescriptor STATE_LOCATION = new PropertyDescriptor.Builder()
             .name("State Location")
             .description("")
             .required(true)
-            .allowableValues(LOCATION_STATELESS,LOCATION_LOCAL, LOCATION_REMOTE)
+            .allowableValues(LOCATION_STATELESS, LOCATION_LOCAL, LOCATION_REMOTE)
             .defaultValue(LOCATION_STATELESS.getValue())
             .build();
 
@@ -213,27 +216,61 @@ public class UpdateAttribute extends AbstractProcessor implements Searchable {
 
     @Override
     protected PropertyDescriptor getSupportedDynamicPropertyDescriptor(final String propertyDescriptorName) {
-        return new PropertyDescriptor.Builder()
-                .name(propertyDescriptorName)
-                .required(false)
-                .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING, true))
-                .addValidator(StandardValidators.ATTRIBUTE_KEY_PROPERTY_NAME_VALIDATOR)
-                .expressionLanguageSupported(true)
-                .dynamic(true)
-                .build();
+        if(scope != null){
+            return new PropertyDescriptor.Builder()
+                    .name(propertyDescriptorName)
+                    .required(false)
+                    .addValidator(StandardValidators.ATTRIBUTE_KEY_PROPERTY_NAME_VALIDATOR)
+                    .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+                    .expressionLanguageSupported(true)
+                    .dynamic(true)
+                    .build();
+        } else {
+            return new PropertyDescriptor.Builder()
+                    .name(propertyDescriptorName)
+                    .required(false)
+                    .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING, true))
+                    .addValidator(StandardValidators.ATTRIBUTE_KEY_PROPERTY_NAME_VALIDATOR)
+                    .expressionLanguageSupported(true)
+                    .dynamic(true)
+                    .build();
+        }
+    }
+
+    @Override
+    public void onPropertyModified(final PropertyDescriptor descriptor, final String oldValue, final String newValue) {
+        super.onPropertyModified(descriptor, oldValue, newValue);
+
+        if (descriptor.equals(STATE_LOCATION)) {
+            if (LOCATION_REMOTE.getValue().equalsIgnoreCase(newValue)) {
+                scope = Scope.CLUSTER;
+            } else if (LOCATION_LOCAL.getValue().equalsIgnoreCase(newValue)) {
+                scope = Scope.LOCAL;
+            } else {
+                scope = null;
+            }
+        }
     }
 
     @OnScheduled
-    public void clearPropertyValueMap(final ProcessContext context) {
+    public void onScheduled(final ProcessContext context) throws IOException {
         propertyValues.clear();
 
-        final String location = context.getProperty(STATE_LOCATION).getValue();
-        if (LOCATION_REMOTE.getValue().equalsIgnoreCase(location)) {
-            scope = Scope.CLUSTER;
-        } else if (LOCATION_LOCAL.getValue().equalsIgnoreCase(location)) {
-            scope = Scope.LOCAL;
-        } else {
-            scope = null;
+        if(scope != null) {
+            StateManager stateManager = context.getStateManager();
+            StateMap state = stateManager.getState(scope);
+            HashMap<String, String> tempMap = new HashMap<>();
+            tempMap.putAll(state.toMap());
+
+            // TODO: only set for new
+            for (PropertyDescriptor entry : context.getProperties().keySet()) {
+                if (entry.isDynamic()) {
+                    if(!tempMap.containsKey(entry.getName()+"_state")) {
+                        tempMap.put(entry.getName() + "_state", "0");
+                    }
+                }
+            }
+            context.getStateManager().setState(tempMap, scope);
         }
     }
 
@@ -519,7 +556,9 @@ public class UpdateAttribute extends AbstractProcessor implements Searchable {
         final Map<String, String> attributesToUpdate = new HashMap<>(actions.size());
         final Set<String> attributesToDelete = new HashSet<>(actions.size());
 
-        try {final Map<String, String> statefulAttributes;
+        try {
+            final Map<String, String> statefulAttributes;
+
             if (scope != null) {
                 statefulAttributes = new HashMap<>(context.getStateManager().getState(scope).toMap());
             } else{
@@ -538,7 +577,7 @@ public class UpdateAttribute extends AbstractProcessor implements Searchable {
                         }
 
                         if (statefulAttributes != null) {
-                            statefulAttributes.put(action.getAttribute(),newAttributeValue);
+                            statefulAttributes.put(action.getAttribute()+"_state", newAttributeValue);
                         }
 
                         attributesToUpdate.put(action.getAttribute(), newAttributeValue);
@@ -572,7 +611,7 @@ public class UpdateAttribute extends AbstractProcessor implements Searchable {
                 }
             }
             if(statefulAttributes != null) {
-
+                context.getStateManager().setState(statefulAttributes, scope);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -601,10 +640,12 @@ public class UpdateAttribute extends AbstractProcessor implements Searchable {
         final Map<String, Action> defaultActions = new HashMap<>();
 
         for (final Map.Entry<PropertyDescriptor, String> entry : properties.entrySet()) {
-            final Action action = new Action();
-            action.setAttribute(entry.getKey().getName());
-            action.setValue(entry.getValue());
-            defaultActions.put(action.getAttribute(), action);
+            if(entry.getKey() != STATE_LOCATION) {
+                final Action action = new Action();
+                action.setAttribute(entry.getKey().getName());
+                action.setValue(entry.getValue());
+                defaultActions.put(action.getAttribute(), action);
+            }
         }
 
         return defaultActions;
