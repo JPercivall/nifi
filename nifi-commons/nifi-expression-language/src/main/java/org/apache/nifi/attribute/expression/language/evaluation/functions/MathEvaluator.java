@@ -76,19 +76,21 @@ public class MathEvaluator extends DecimalEvaluator {
                 Method method = Math.class.getMethod(methodNamedValue, double.class);
 
                 if(method == null) {
-                    throw new AttributeExpressionLanguageException("Cannot evaluate 'math' function because no method was found matching the passed parameters: name:'"+methodNamedValue+"' and one double argument.");
+                    throw new AttributeExpressionLanguageException("Cannot evaluate 'math' function because no method was found matching the passed parameters:" +
+                            " name:'"+methodNamedValue+"' and one double argument.");
                 }
 
-                executionValue = (Double) method.invoke (null, (double) subjectValue);
+                executionValue = (Double) method.invoke(null, (double) subjectValue);
 
             } else {
 
                 Method method = Math.class.getMethod(methodNamedValue, double.class, double.class);
 
                 if(method == null) {
-                    throw new AttributeExpressionLanguageException("Cannot evaluate 'math' function because no method was found matching the passed parameters: name:'"+methodNamedValue+"' and two double arguments.");
+                    throw new AttributeExpressionLanguageException("Cannot evaluate 'math' function because no method was found matching the passed parameters: " +
+                            "name:'"+methodNamedValue+"' and two double arguments.");
                 }
-                executionValue = (Double) method.invoke (null, (double) subjectValue, (double) optionalDecimalValue);
+                executionValue = (Double) method.invoke(null, (double) subjectValue, (double) optionalDecimalValue);
             }
 
             return new DecimalQueryResult(executionValue);

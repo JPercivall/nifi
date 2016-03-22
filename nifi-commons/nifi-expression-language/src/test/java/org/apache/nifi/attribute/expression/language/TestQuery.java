@@ -746,9 +746,9 @@ public class TestQuery {
         attributes.put("two", "2");
         attributes.put("one.two", "1.2984581213888124");
         attributes.put("tiny", "5.577469913807151E-4");
-        attributes.put("otherFormat", "1.5304136440e+0");
+        attributes.put("otherFormat", "1.5304136440e+1");
 
-        verifyEquals("${otherFormat:math('sqrt')}", attributes, .2370988820623838);
+        verifyEquals("${otherFormat:math('sqrt')}", attributes, 3.9120501581651532);
         verifyEquals("${tiny:math('sqrt')}", attributes, 0.023616667660377386);
 
         verifyEquals("${negative:math('abs')}", attributes, 1.0);

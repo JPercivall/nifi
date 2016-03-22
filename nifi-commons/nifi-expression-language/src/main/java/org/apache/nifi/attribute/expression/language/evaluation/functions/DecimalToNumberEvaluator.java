@@ -16,8 +16,6 @@
  */
 package org.apache.nifi.attribute.expression.language.evaluation.functions;
 
-import org.apache.nifi.attribute.expression.language.evaluation.DecimalEvaluator;
-import org.apache.nifi.attribute.expression.language.evaluation.DecimalQueryResult;
 import org.apache.nifi.attribute.expression.language.evaluation.Evaluator;
 import org.apache.nifi.attribute.expression.language.evaluation.NumberEvaluator;
 import org.apache.nifi.attribute.expression.language.evaluation.NumberQueryResult;
