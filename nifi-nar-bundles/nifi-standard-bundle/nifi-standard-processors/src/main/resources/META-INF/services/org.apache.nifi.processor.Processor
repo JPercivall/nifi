@@ -84,3 +84,4 @@ org.apache.nifi.processors.standard.UnpackContent
 org.apache.nifi.processors.standard.ValidateXml
 org.apache.nifi.processors.standard.ExecuteSQL
 org.apache.nifi.processors.standard.FetchDistributedMapCache
+org.apache.nifi.processors.standard.RollingWindowAggregator
