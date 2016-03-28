@@ -78,10 +78,8 @@ public class TestRollingWindowAggregator {
         runner.setProperty(RollingWindowAggregator.VALUE_TO_STORE, "${value}");
         runner.setProperty(RollingWindowAggregator.STATE_LOCATION, RollingWindowAggregator.LOCATION_LOCAL);
         runner.setProperty(RollingWindowAggregator.AGGREGATE_VALUE, "${aggregate_value_state:plusDecimal(${rolling_value_state})}");
-        runner.setProperty(RollingWindowAggregator.TIME_WINDOW, "60 sec");
+        runner.setProperty(RollingWindowAggregator.TIME_WINDOW, "10 sec");
         runner.setProperty(RollingWindowAggregator.ADD_COUNT_AS_ATTRIBUTE, "true");
-
-
 
         MockFlowFile flowFile;
 
@@ -96,6 +94,29 @@ public class TestRollingWindowAggregator {
             runner.clearTransferState();
             flowFile.assertAttributeEquals("rolling_window_value", String.valueOf(Double.valueOf(i)));
             flowFile.assertAttributeEquals("rolling_window_count", String.valueOf(i));
+            Thread.sleep(10L);
+        }
+
+
+
+        runner.setProperty(RollingWindowAggregator.VALUE_TO_STORE, "${value}");
+        runner.setProperty(RollingWindowAggregator.BATCH_VALUE, "${current_batch_value_state:plusDecimal(${rolling_value_state})}");
+        runner.setProperty(RollingWindowAggregator.STATE_LOCATION, RollingWindowAggregator.LOCATION_LOCAL);
+        runner.setProperty(RollingWindowAggregator.AGGREGATE_VALUE, "${aggregate_value_state:plusDecimal(${batch_value_state})}");
+        runner.setProperty(RollingWindowAggregator.MICRO_BATCH, "5 sec");
+        runner.setProperty(RollingWindowAggregator.TIME_WINDOW, "10 sec");
+        runner.setProperty(RollingWindowAggregator.ADD_COUNT_AS_ATTRIBUTE, "true");
+
+        for(int i = 1; i<10; i++){
+            runner.enqueue(String.valueOf(i).getBytes(), attributes);
+
+            runner.run();
+
+            flowFile = runner.getFlowFilesForRelationship(CompressContent.REL_SUCCESS).get(0);
+            runner.clearTransferState();
+            flowFile.assertAttributeEquals("rolling_window_value", String.valueOf(Double.valueOf(i)));
+            flowFile.assertAttributeEquals("rolling_window_count", String.valueOf(i));
+
             Thread.sleep(1000L);
         }
 

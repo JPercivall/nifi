@@ -46,6 +46,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -284,8 +285,10 @@ public class RollingWindowAggregator extends AbstractProcessor {
             if (currTime - Long.valueOf(currBatchStart) > microBatchTime) {
                 newBatch = true;
                 state.remove("start_curr_batch_ts");
+                currBatchStart = String.valueOf(currTime);
             }
         } else {
+            newBatch = true;
             currBatchStart = String.valueOf(currTime);
             state.put("start_curr_batch_ts", currBatchStart);
         }
@@ -315,8 +318,6 @@ public class RollingWindowAggregator extends AbstractProcessor {
                 } else {
                     count += Long.valueOf(state.get(key));
                 }
-            } else if(!key.equals("start_curr_batch_ts")) {
-                count++;
             }
         }
 
@@ -329,87 +330,63 @@ public class RollingWindowAggregator extends AbstractProcessor {
         Double currentBatchValue =  0.0;
         Long currentBatchCount = 0L;
 
-
-
-
         for(Map.Entry<String,String> entry: state.entrySet()){
-             String key = entry.getKey();
-            if (entry.getKey().endsWith("_batch")) {
-                String timeStampString = entry.getKey().substring(0, entry.getKey().length()-6);
+            String key = entry.getKey();
+            if (key.endsWith("_batch")) {
+                String timeStampString = key.substring(0, key.length()-6);
+
+                String batchValue = entry.getValue();
                 Long batchCount = Long.valueOf(state.get(timeStampString+"_count"));
+                if (!newBatch && timeStampString.equals(currBatchStart)) {
+
+                    final String currentFlowFileValue = context.getProperty(VALUE_TO_STORE).evaluateAttributeExpressions(flowFile).getValue();
+                    batchCount++;
+
+                    elHelper.clear();
+                    elHelper.put("rolling_value_state", currentFlowFileValue);
+                    elHelper.put("current_batch_value_state", String.valueOf(batchValue));
+                    elHelper.put("current_batch_count_state", String.valueOf(batchCount));
+                    elHelper.put("total_count_state", String.valueOf(count));
+
+                    batchValue = context.getProperty(BATCH_VALUE).evaluateAttributeExpressions(elHelper).getValue();
+                    currentBatchValue = Double.valueOf(batchValue);
+                    currentBatchCount = batchCount;
+                }
 
                 elHelper.clear();
-                elHelper.put("batch_value_state", entry.getValue());
+                elHelper.put("batch_value_state", batchValue);
                 elHelper.put("batch_count_state", String.valueOf(batchCount));
                 elHelper.put("total_count_state", String.valueOf(count));
                 elHelper.put("aggregate_value_state", String.valueOf(aggregateValue));
 
                 aggregateValue = context.getProperty(AGGREGATE_VALUE).evaluateAttributeExpressions(elHelper).asDouble();
 
-            } else if(!key.endsWith("_count") && !key.equals("start_curr_batch_ts")){
-                currentBatchCount++;
-                elHelper.clear();
-                elHelper.put("rolling_value_state", entry.getValue());
-                elHelper.put("current_batch_value_state", String.valueOf(currentBatchValue));
-                elHelper.put("current_batch_count_state", String.valueOf(currentBatchCount));
-                elHelper.put("total_count_state", String.valueOf(count));
-
-                currentBatchValue = context.getProperty(BATCH_VALUE).evaluateAttributeExpressions(elHelper).asDouble();
-                if(newBatch){
-                    keysToRemove.add(entry.getKey());
-                }
             }
         }
 
-        final String currentFlowFileValue = context.getProperty(VALUE_TO_STORE).evaluateAttributeExpressions(flowFile).getValue();
         if(newBatch) {
+            final String currentFlowFileValue = context.getProperty(VALUE_TO_STORE).evaluateAttributeExpressions(flowFile).getValue();
+
             elHelper.clear();
             elHelper.put("rolling_value_state", currentFlowFileValue);
             elHelper.put("current_batch_value_state", String.valueOf(0));
             elHelper.put("current_batch_count_state", String.valueOf(1));
             elHelper.put("total_count_state", String.valueOf(count));
 
-            Double singleValueBatch = context.getProperty(BATCH_VALUE).evaluateAttributeExpressions(elHelper).asDouble();
+            currentBatchValue = context.getProperty(BATCH_VALUE).evaluateAttributeExpressions(elHelper).asDouble();
+            currentBatchCount = 1L;
 
             elHelper.clear();
-            elHelper.put("batch_value_state", String.valueOf(singleValueBatch));
+            elHelper.put("batch_value_state", String.valueOf(currentBatchValue));
             elHelper.put("batch_count_state", String.valueOf(1));
             elHelper.put("total_count_state", String.valueOf(count));
             elHelper.put("aggregate_value_state", String.valueOf(aggregateValue));
 
             aggregateValue = context.getProperty(AGGREGATE_VALUE).evaluateAttributeExpressions(elHelper).asDouble();
-
-        } else {
-            elHelper.clear();
-            elHelper.put("rolling_value_state", currentFlowFileValue);
-            elHelper.put("current_batch_value_state", String.valueOf(currentBatchValue));
-            elHelper.put("current_batch_count_state", String.valueOf(currentBatchCount));
-            elHelper.put("total_count_state", String.valueOf(count));
-
-            currentBatchValue = context.getProperty(BATCH_VALUE).evaluateAttributeExpressions(elHelper).asDouble();
         }
 
-        state.put(String.valueOf(currTime), String.valueOf(currentFlowFileValue));
-
-        elHelper.clear();
-        elHelper.put("batch_value_state", String.valueOf(currentBatchValue));
-        elHelper.put("batch_count_state", String.valueOf(currentBatchCount));
-        elHelper.put("total_count_state", String.valueOf(count));
-        elHelper.put("aggregate_value_state", String.valueOf(aggregateValue));
-
-        aggregateValue = context.getProperty(AGGREGATE_VALUE).evaluateAttributeExpressions(elHelper).asDouble();
-
-        if(newBatch) {
-            // TODO ability to chose current time or start time
-            //Long newBatchTimeStamp = currBatchStart;
-            state.put(currBatchStart + "_batch", String.valueOf(currentBatchValue));
-            state.put(currBatchStart + "_count", String.valueOf(currentBatchCount));
-
-            keysToRemove.add(currBatchStart);
-            for(String key:keysToRemove){
-                state.remove(key);
-            }
-        }
+        state.put(currBatchStart + "_batch", String.valueOf(currentBatchValue));
+        state.put(currBatchStart + "_count", String.valueOf(currentBatchCount));
 
         stateManager.setState(state, scope);
 
