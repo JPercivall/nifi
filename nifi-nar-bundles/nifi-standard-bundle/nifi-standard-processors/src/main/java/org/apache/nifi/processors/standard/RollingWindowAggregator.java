@@ -284,8 +284,8 @@ public class RollingWindowAggregator extends AbstractProcessor {
         if(currBatchStart != null){
             if (currTime - Long.valueOf(currBatchStart) > microBatchTime) {
                 newBatch = true;
-                state.remove("start_curr_batch_ts");
                 currBatchStart = String.valueOf(currTime);
+                state.put("start_curr_batch_ts", currBatchStart);
             }
         } else {
             newBatch = true;
