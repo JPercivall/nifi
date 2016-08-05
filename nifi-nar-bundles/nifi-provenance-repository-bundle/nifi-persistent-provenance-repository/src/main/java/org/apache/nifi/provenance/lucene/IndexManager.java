@@ -404,7 +404,7 @@ public class IndexManager implements Closeable {
             for (final List<ActiveIndexSearcher> searcherList : activeSearchers.values()) {
                 for (final ActiveIndexSearcher searcher : searcherList) {
                     try {
-                        searcher.close();
+                        searcher.close(true);
                     } catch (final IOException e) {
                         if ( ioe == null ) {
                             ioe = e;
@@ -492,8 +492,12 @@ public class IndexManager implements Closeable {
 
         @Override
         public void close() throws IOException {
+            close(false);
+        }
+
+        public void close(boolean force) throws IOException {
             final int updatedRefCount = referenceCount.decrementAndGet();
-            if (updatedRefCount <= 0) {
+            if (updatedRefCount <= 0 || force) {
                 logger.debug("Decremented Reference Count for {} to {}; closing underlying directory reader", this, updatedRefCount);
                 IndexManager.close(directoryReader, directory);
             } else {

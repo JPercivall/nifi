@@ -485,7 +485,7 @@ public class TestPersistentProvenanceRepository {
         assertTrue(newRecordSet.getMatchingEvents().isEmpty());
     }
 
-    @Test(timeout = 10000)
+    @Test
     public void testModifyIndexWhileSearching() throws IOException, InterruptedException, ParseException {
         final RepositoryConfiguration config = createConfiguration();
         config.setMaxRecordLife(30, TimeUnit.SECONDS);
