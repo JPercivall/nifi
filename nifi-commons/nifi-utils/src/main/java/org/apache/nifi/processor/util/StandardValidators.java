@@ -649,6 +649,31 @@ public class StandardValidators {
         };
     }
 
+
+    public static Validator createDecimalValidator(final double minimum, final double maximum, final boolean inclusive) {
+        return new Validator() {
+            @Override
+            public ValidationResult validate(final String subject, final String input, final ValidationContext context) {
+                if (context.isExpressionLanguageSupported(subject) && context.isExpressionLanguagePresent(input)) {
+                    return new ValidationResult.Builder().subject(subject).input(input).explanation("Expression Language Present").valid(true).build();
+                }
+
+                String reason = null;
+                try {
+                    final double doubleVal = Double.parseDouble(input);
+                    if (doubleVal < minimum || (!inclusive && doubleVal == minimum) | doubleVal > maximum || (!inclusive && doubleVal == maximum)) {
+                        reason = "Value must be between " + minimum + " and " + maximum + " (" + (inclusive ? "inclusive" : "exclusive") + ")";
+                    }
+                } catch (final NumberFormatException e) {
+                    reason = "not a valid decimal";
+                }
+
+                return new ValidationResult.Builder().subject(subject).input(input).explanation(reason).valid(reason == null).build();
+            }
+
+        };
+    }
+
     //
     //
     // SPECIFIC VALIDATOR IMPLEMENTATIONS THAT CANNOT BE ANONYMOUS CLASSES
