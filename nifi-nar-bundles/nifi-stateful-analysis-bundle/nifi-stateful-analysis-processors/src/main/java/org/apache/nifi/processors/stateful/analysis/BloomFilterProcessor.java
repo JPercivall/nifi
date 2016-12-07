@@ -229,7 +229,7 @@ public class BloomFilterProcessor extends AbstractProcessor{
         session.getProvenanceReporter().route(flowFile, toTransferTo);
     }
 
-    orestes.bloomfilter.BloomFilter<String> getUnderlyingBloomFilter(){
+    public orestes.bloomfilter.BloomFilter<String> getUnderlyingBloomFilter(){
         return this.theBloomFilter;
     }
 }

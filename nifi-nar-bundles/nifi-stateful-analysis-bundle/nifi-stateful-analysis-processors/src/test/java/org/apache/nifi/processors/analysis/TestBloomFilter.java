@@ -67,23 +67,48 @@ public class TestBloomFilter {
 
         //Add 1000 elements
         for (int i = 0; i < 1000; i++) {
-            runner.enqueue("test", Collections.singletonMap("hash", "Element "+i));
+            runner.enqueue("test", Collections.singletonMap("hash", "Element " + i));
         }
         runner.run(1000);
 
         List<MockFlowFile> duplicates = runner.getFlowFilesForRelationship(REL_DUPLICATE);
         assertEquals(4, duplicates.size());
         MockFlowFile first = duplicates.get(0);
-        first.assertAttributeEquals("hash", "Element 598" );
+        first.assertAttributeEquals("hash", "Element 598");
 
         MockFlowFile second = duplicates.get(1);
-        second.assertAttributeEquals("hash", "Element 787" );
+        second.assertAttributeEquals("hash", "Element 787");
 
         MockFlowFile third = duplicates.get(2);
-        third.assertAttributeEquals("hash", "Element 865" );
+        third.assertAttributeEquals("hash", "Element 865");
 
         MockFlowFile fourth = duplicates.get(3);
-        fourth.assertAttributeEquals("hash", "Element 987" );
+        fourth.assertAttributeEquals("hash", "Element 987");
+    }
+
+
+    @Test
+    public void testBasicAdding(){
+        final TestRunner runner = TestRunners.newTestRunner(BloomFilterProcessor.class);
+        runner.setProperty(HASH_VALUE, "${hash}");
+        runner.setProperty(EXPECTED_ELEMENTS, "1");
+        runner.setProperty(FALSE_POSITIVE, "0.1");
+        runner.setProperty(TYPE_OF_FILTER, REGULAR_BLOOM_FILTER);
+        runner.assertValid();
+
+        Map<String, String> attributes = new HashMap<>();
+        attributes.put(TEST_ONLY_ATTRIBUTE, "true");
+        attributes.put("hash", "test");
+        runner.enqueue("test", attributes);
+
+        runner.enqueue("test", Collections.singletonMap("hash", "test"));
+
+        runner.enqueue("test", attributes);
+        runner.run(3);
+
+        runner.assertQueueEmpty();
+        runner.assertTransferCount(REL_DUPLICATE, 1);
+        runner.assertTransferCount(REL_NON_DUPLICATE, 2);
     }
 
 
@@ -105,7 +130,6 @@ public class TestBloomFilter {
         for (int i = 0; i < 300; i++) {
             runner.enqueue("test", Collections.singletonMap("hash", "Element "+i));
         }
-        runner.run(303);
 
         for (int i = 300; i < 1000; i++) {
             Map<String, String> attributes = new HashMap<>();
@@ -113,17 +137,18 @@ public class TestBloomFilter {
             attributes.put("hash", "Element " + i);
             runner.enqueue("test", attributes);
         }
-        runner.run(700);
+        runner.run(1003);
 
-        runner.assertTransferCount(REL_NON_DUPLICATE, 1001);
+        runner.assertTransferCount(REL_NON_DUPLICATE, 1002);
 
         List<MockFlowFile> duplicates = runner.getFlowFilesForRelationship(REL_DUPLICATE);
-        assertEquals(2, duplicates.size());
+        assertEquals(1, duplicates.size());
         MockFlowFile first = duplicates.get(0);
-        first.assertAttributeEquals("hash", "Element 440" );
+        first.assertAttributeEquals("hash", "Element 999" );
 
+        /*
         MockFlowFile second = duplicates.get(1);
-        second.assertAttributeEquals("hash", "Element 669" );
+        second.assertAttributeEquals("hash", "Element 669" );*/
     }
 
     @Test
@@ -139,7 +164,7 @@ public class TestBloomFilter {
             String element = "Element " + i;
             bf.add(element);
         }
-//test for false positives
+        //test for false positives
         for (int i = 300; i < 1000; i++) {
             String element = "Element " + i;
             if(bf.contains(element)) {
