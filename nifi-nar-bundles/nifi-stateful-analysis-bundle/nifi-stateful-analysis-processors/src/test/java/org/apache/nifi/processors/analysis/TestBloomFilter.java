@@ -19,12 +19,12 @@ package org.apache.nifi.processors.analysis;
 
 import orestes.bloomfilter.BloomFilter;
 import orestes.bloomfilter.FilterBuilder;
-import org.apache.nifi.processors.analysis.common.TestBloomFilterCommon;
 import org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor;
 import org.apache.nifi.util.MockFlowFile;
 import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Collections;
