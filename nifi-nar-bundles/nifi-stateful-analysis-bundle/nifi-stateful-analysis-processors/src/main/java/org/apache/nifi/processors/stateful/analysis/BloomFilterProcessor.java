@@ -17,6 +17,7 @@
 
 package org.apache.nifi.processors.stateful.analysis;
 
+import com.sun.javafx.UnmodifiableArrayList;
 import orestes.bloomfilter.CountingBloomFilter;
 import orestes.bloomfilter.FilterBuilder;
 import org.apache.nifi.annotation.behavior.EventDriven;
@@ -31,6 +32,7 @@ import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationContext;
 import org.apache.nifi.components.ValidationResult;
+import org.apache.nifi.expression.AttributeExpression;
 import org.apache.nifi.flowfile.FlowFile;
 import org.apache.nifi.processor.AbstractProcessor;
 import org.apache.nifi.processor.ProcessContext;
@@ -43,10 +45,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import static org.apache.nifi.expression.AttributeExpression.*;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.COUNT_ATTRIBUTE_NAME;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.REMOVE_COUNT_ATTRIBUTE;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.TEST_ONLY_ATTRIBUTE;
@@ -118,12 +120,12 @@ public class BloomFilterProcessor extends AbstractProcessor{
             .description("The value to add to the bloom filter and detect duplicates on.")
             .required(true)
             .expressionLanguageSupported(true)
-            .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(ResultType.STRING, false))
+            .addValidator(StandardValidators.createAttributeExpressionLanguageValidator(AttributeExpression.ResultType.STRING, false))
             .build();
 
     public static final PropertyDescriptor EXPECTED_ELEMENTS = new PropertyDescriptor.Builder()
             .name("Expected elements")
-            .description("A rough estimate of the number of expected elements to be tracked in the filter")
+            .description("A rough estimate of the number of expected elements to be tracked in the filter.")
             .required(true)
             .expressionLanguageSupported(true)
             .addValidator(StandardValidators.createLongValidator(0, Integer.MAX_VALUE, true))
@@ -157,8 +159,8 @@ public class BloomFilterProcessor extends AbstractProcessor{
 
     public static final PropertyDescriptor REDIS_BACKED = new PropertyDescriptor.Builder()
             .name("Redis Backed")
-            .description("Whether or not a Redis instance will be used as the storage end-point for the Bloom filter. If this is true the then 'Redis Hostname', 'Redis Port' and 'Redis Filter Name' " +
-                    "are required. If this is false then an in-memory bloom filter will be used.")
+            .description("Whether or not a Redis instance will be used as the storage end-point for the Bloom filter. If this is true the then 'Redis Hostname', 'Redis Port' and " +
+                    "'Redis Filter Name' are required. If this is false then an in-memory bloom filter will be used.")
             .required(false)
             .allowableValues("true", "false")
             .defaultValue("false")
@@ -188,6 +190,14 @@ public class BloomFilterProcessor extends AbstractProcessor{
             .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
             .build();
 
+    public static final PropertyDescriptor RESET_FILTER_ON_START = new PropertyDescriptor.Builder()
+            .name("Reset Filter On Start")
+            .description("If this is true then each time the processor is started, the filter will be reset/remade. .")
+            .required(false)
+            .expressionLanguageSupported(true)
+            .addValidator(StandardValidators.NON_EMPTY_VALIDATOR)
+            .build();
+
     public static final PropertyDescriptor TYPE_OF_FILTER = new PropertyDescriptor.Builder()
             .name("Type of filter")
             .description("The type of bloom filter to use.")
@@ -208,6 +218,33 @@ public class BloomFilterProcessor extends AbstractProcessor{
 
     private volatile orestes.bloomfilter.BloomFilter<String> theBloomFilter;
     private volatile boolean isCounting;
+    private volatile boolean remakeFilter;
+
+    private final List<String> VALUES_IF_CHANGED_MUST_REMAKE_FILTER;
+
+    {
+        List<String> temp = new LinkedList<>();
+        temp.add(EXPECTED_ELEMENTS.getName());
+        temp.add(FALSE_POSITIVE.getName());
+        temp.add(REDIS_BACKED.getName());
+        temp.add(SIZE.getName());
+        temp.add(COUNTER_SIZE.getName());
+        temp.add(TYPE_OF_FILTER.getName());
+        temp.add(REDIS_FILTER_NAME.getName());
+        VALUES_IF_CHANGED_MUST_REMAKE_FILTER = new UnmodifiableArrayList<>((String[]) temp.toArray(), temp.size());
+    }
+
+
+    @Override
+    public void onPropertyModified(final PropertyDescriptor descriptor, final String oldValue, final String newValue) {
+        if (VALUES_IF_CHANGED_MUST_REMAKE_FILTER.contains(descriptor.getName())) {
+            if (oldValue == null) {
+                remakeFilter = (newValue != null);
+            } else if (!oldValue.equals(newValue)) {
+                remakeFilter = true;
+            }
+        }
+    }
 
 
     @Override

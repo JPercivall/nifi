@@ -17,19 +17,15 @@
 
 package org.apache.nifi.processors.analysis.integration;
 
-import orestes.bloomfilter.BloomFilter;
-import orestes.bloomfilter.FilterBuilder;
+
 import org.apache.nifi.processors.analysis.TestBloomFilter;
 import org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor;
 import org.apache.nifi.util.MockFlowFile;
-import org.apache.nifi.util.TestRunner;
 import org.apache.nifi.util.TestRunners;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
-import redis.clients.jedis.Client;
 import redis.clients.jedis.Jedis;
 
 import java.util.ArrayList;
@@ -50,7 +46,6 @@ import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.REDIS_FILTER_NAME;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.REDIS_HOSTNAME;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.REDIS_PORT;
-import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.REGULAR_BLOOM_FILTER;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.REL_DUPLICATE;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.REL_NON_DUPLICATE;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.REMOVE_COUNT_ATTRIBUTE;
@@ -58,7 +53,6 @@ import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.TEST_ONLY_ATTRIBUTE;
 import static org.apache.nifi.processors.stateful.analysis.BloomFilterProcessor.TYPE_OF_FILTER;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class TestBloomFilterRedisBacked extends TestBloomFilter {
     /*
